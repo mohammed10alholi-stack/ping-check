@@ -31,7 +31,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px
   display:flex;flex-direction:column;gap:16px}
 header h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em}
 header p{margin:2px 0 0;color:var(--muted);font-size:14px}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px}
 .tabs button{appearance:none;border:0;background:transparent;color:var(--muted);font:500 15px var(--sans);padding:9px 4px;border-radius:8px;cursor:pointer}
 .tabs button[aria-selected="true"]{background:var(--accent);color:#1a1307;font-weight:700}
 .go{appearance:none;border:0;background:var(--fg);color:var(--bg);font:700 17px var(--sans);padding:14px;border-radius:12px;cursor:pointer;width:100%}
@@ -84,6 +84,7 @@ h2{font-size:14px;color:var(--muted);font-weight:500;margin:6px 0 -8px}
     <button role="tab" id="tab-net" data-tab="net" aria-selected="true">النت</button>
     <button role="tab" id="tab-fc" data-tab="fc" aria-selected="false">FC 27</button>
     <button role="tab" id="tab-cod" data-tab="cod" aria-selected="false">MW4</button>
+    <button role="tab" id="tab-dns" data-tab="dns" aria-selected="false">DNS</button>
   </div>
 
   <button class="go" id="go">ابدأ الفحص</button>
@@ -152,8 +153,21 @@ const TABS = {
     points:['frankfurt','london','paris','stockholm','milan','madrid','zurich','telaviv','manama','dubai','mumbai'],
     missing:[],
     note:'Activision ما بتنشر قائمة رسمية بسيرفرات MW4، فهاي أقرب مراكز البيانات الكبيرة اللي بتستخدمها ألعاب الأونلاين. الماتش ميكنج بيفضّل الأقل بنق، فالأول بالقائمة هو <b>الأرجح</b>.'
+  },
+  dns: {
+    lab:'أسرع DNS عندك',
+    points:['dns_cf','dns_google','dns_quad9','dns_adguard','dns_opendns'],
+    missing:[],
+    note:'الـ DNS <b>ما بيأثر على البنق داخل اللعبة</b>، بيأثر على سرعة فتح المواقع وبداية التحميل. الأرقام تحت كل اسم هي اللي بتكتبها بإعدادات DNS اليدوي بالبلايستيشن (الأساسي ثم الثانوي). الـ DNS التلقائي تبع الشركة ما بنقدر نقيسه من المتصفح.'
   }
 };
+Object.assign(POINTS, {
+  dns_cf:      {ar:'Cloudflare', en:'1.1.1.1 · 1.0.0.1', url:'https://cloudflare-dns.com/dns-query?name=example.com&type=A'},
+  dns_google:  {ar:'Google',     en:'8.8.8.8 · 8.8.4.4', url:'https://dns.google/resolve?name=example.com'},
+  dns_quad9:   {ar:'Quad9',      en:'9.9.9.9 · 149.112.112.112', url:'https://dns.quad9.net/dns-query?name=example.com'},
+  dns_adguard: {ar:'AdGuard',    en:'94.140.14.14 · 94.140.15.15', url:'https://dns.adguard-dns.com/resolve?name=example.com'},
+  dns_opendns: {ar:'OpenDNS',    en:'208.67.222.222 · 208.67.220.220', url:'https://doh.opendns.com/dns-query?dns=AAABAAABAAAAAAAAB2V4YW1wbGUDY29tAAABAAE'},
+});
 
 let tab = 'net', running = false, results = {};
 
