@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#11151d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>فاحص البنق</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column — tabs, one action button, a ranked list of server cities with ping bars, live monitor sheet */
+:root{
+  --bg:#11151d; --surface:#181e29; --line:#273041; --fg:#e8ecf3; --muted:#8c97ab;
+  --accent:#f2b544; --good:#3ecf8e; --ok:#c9d65a; --warn:#f2994a; --bad:#eb5757;
+  --sans:"IBM Plex Sans Arabic",system-ui,"Segoe UI",Tahoma,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root{ --bg:#f3f4f7; --surface:#ffffff; --line:#dde1e9; --fg:#151a24; --muted:#5e687a;
+         --accent:#b7780b; --good:#14945c; --ok:#7d8a12; --warn:#c2620f; --bad:#c62f2f; color-scheme:light; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:560px;margin:0 auto;padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:16px}
+header h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em}
+header p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px}
+.tabs button{appearance:none;border:0;background:transparent;color:var(--muted);font:500 15px var(--sans);padding:9px 4px;border-radius:8px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:#1a1307;font-weight:700}
+.go{appearance:none;border:0;background:var(--fg);color:var(--bg);font:700 17px var(--sans);padding:14px;border-radius:12px;cursor:pointer;width:100%}
+.go:disabled{opacity:.55;cursor:default}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:4px}
+.verdict .lab{color:var(--muted);font-size:13px}
+.verdict .big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.verdict .city{font-size:22px;font-weight:700}
+.verdict .ms{font:600 30px var(--mono);font-variant-numeric:tabular-nums}
+.verdict .sub{color:var(--muted);font-size:13px}
+.list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:12px 2px;border-bottom:1px solid var(--line);cursor:pointer;background:none;border-inline:0;border-top:0;color:inherit;font:inherit;text-align:start;width:100%}
+.row:hover{background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.row .name{font-weight:500;min-width:0}
+.row .name small{color:var(--muted);font-weight:400;margin-inline-start:6px}
+.row .val{font:600 16px var(--mono);font-variant-numeric:tabular-nums;text-align:end}
+.row .bar{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.row .bar i{display:block;height:100%;width:0;border-radius:3px;transition:width .4s ease}
+.row .meta{grid-column:1/-1;display:flex;justify-content:space-between;color:var(--muted);font-size:12.5px}
+.row.off{cursor:default;opacity:.55}
+.chip{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:99px;border:1px solid currentColor}
+.note{color:var(--muted);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.note b{color:var(--fg)}
+h2{font-size:14px;color:var(--muted);font-weight:500;margin:6px 0 -8px}
+/* live sheet */
+.live{position:fixed;inset:auto 0 0 0;background:var(--surface);border-top:1px solid var(--line);
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  box-shadow:0 -10px 30px rgba(0,0,0,.35);z-index:20}
+.live .in{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.live .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.live .top strong{font-size:17px}
+.live .stop{appearance:none;border:1px solid var(--line);background:transparent;color:var(--fg);font:500 14px var(--sans);padding:7px 14px;border-radius:9px;cursor:pointer}
+.live canvas{width:100%;height:110px;display:block}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.stats div{display:flex;flex-direction:column}
+.stats span{color:var(--muted);font-size:12px}
+.stats b{font:600 18px var(--mono);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion: reduce){.row .bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>فاحص البنق</h1>
+    <p>افتحها من الجوال وأنت على نفس الواي فاي اللي عليه البلايستيشن.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-net" data-tab="net" aria-selected="true">النت</button>
+    <button role="tab" id="tab-fc" data-tab="fc" aria-selected="false">FC 27</button>
+    <button role="tab" id="tab-cod" data-tab="cod" aria-selected="false">MW4</button>
+  </div>
+
+  <button class="go" id="go">ابدأ الفحص</button>
+
+  <div class="verdict" id="verdict">
+    <span class="lab" id="v-lab">اضغط ابدأ الفحص</span>
+    <div class="big"><span class="city" id="v-city">—</span><span class="ms" id="v-ms"></span></div>
+    <span class="sub" id="v-sub"></span>
+  </div>
+
+  <div class="list" id="list"></div>
+
+  <div class="note" id="note"></div>
+</div>
+
+<div class="live" id="live" hidden>
+  <div class="in">
+    <div class="top"><strong id="live-title">قياس مستمر</strong><button class="stop" id="live-stop">إيقاف</button></div>
+    <canvas id="chart" width="1000" height="220"></canvas>
+    <div class="stats">
+      <div><span>الحالي</span><b id="s-now">—</b></div>
+      <div><span>المتوسط</span><b id="s-avg">—</b></div>
+      <div><span>الأعلى</span><b id="s-max">—</b></div>
+      <div><span>ضايع</span><b id="s-loss">—</b></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const aws = r => `https://dynamodb.${r}.amazonaws.com/ping`;
+
+// نقاط القياس: كل مدينة لها سيرفر سحابي بنفس المدينة أو قريب منها جدًا
+const POINTS = {
+  frankfurt: {ar:'فرانكفورت', en:'ألمانيا', url:aws('eu-central-1')},
+  london:    {ar:'لندن',      en:'بريطانيا', url:aws('eu-west-2')},
+  paris:     {ar:'باريس',     en:'فرنسا', url:aws('eu-west-3')},
+  dublin:    {ar:'دبلن',      en:'إيرلندا', url:aws('eu-west-1')},
+  milan:     {ar:'ميلانو',    en:'إيطاليا', url:aws('eu-south-1')},
+  madrid:    {ar:'مدريد',     en:'إسبانيا', url:aws('eu-south-2')},
+  stockholm: {ar:'ستوكهولم',  en:'السويد', url:aws('eu-north-1')},
+  zurich:    {ar:'زيورخ',     en:'سويسرا', url:aws('eu-central-2')},
+  telaviv:   {ar:'تل أبيب',   en:'', url:aws('il-central-1')},
+  manama:    {ar:'البحرين',   en:'المنامة', url:aws('me-south-1')},
+  dubai:     {ar:'دبي',       en:'الإمارات', url:aws('me-central-1')},
+  mumbai:    {ar:'مومباي',    en:'الهند', url:aws('ap-south-1')},
+  cloudflare:{ar:'Cloudflare',en:'أقرب سيرفر إلك', url:'https://www.cloudflare.com/cdn-cgi/trace'},
+  google:    {ar:'Google',    en:'أقرب سيرفر إلك', url:'https://www.google.com/generate_204'},
+};
+
+const TABS = {
+  net: {
+    lab:'بنق النت العام',
+    points:['cloudflare','google','frankfurt','telaviv'],
+    missing:[],
+    note:'هاد بنق النت نفسه لأقرب السيرفرات. إذا كان عالي هون، رح يكون عالي بكل الألعاب، والمشكلة من النت أو الراوتر مش من اللعبة. <b>اضغط على أي سطر</b> عشان تفتح قياس مستمر.'
+  },
+  fc: {
+    lab:'الأرجح إنك بتلعب على',
+    // مراكز بيانات EA FC الرسمية القريبة
+    points:['frankfurt','london','paris','dublin','milan','madrid','telaviv','manama','dubai','mumbai'],
+    missing:['أمستردام','هلسنكي','إسطنبول','وارسو','الدمام'],
+    note:'هاي مراكز بيانات FC الرسمية القريبة منك. اللعبة بتحاول توصلك على المركز اللي بنقه أقل، فالأقل بالقائمة هو <b>الأرجح</b> إنك عليه. ممكن اللعبة تحطك على غيره إذا المركز عليه ضغط أو في مشكلة بالخط. بعض المراكز ما إلها نقطة قياس من المتصفح.'
+  },
+  cod: {
+    lab:'الأرجح إنك بتلعب على',
+    points:['frankfurt','london','paris','stockholm','milan','madrid','zurich','telaviv','manama','dubai','mumbai'],
+    missing:[],
+    note:'Activision ما بتنشر قائمة رسمية بسيرفرات MW4، فهاي أقرب مراكز البيانات الكبيرة اللي بتستخدمها ألعاب الأونلاين. الماتش ميكنج بيفضّل الأقل بنق، فالأول بالقائمة هو <b>الأرجح</b>.'
+  }
+};
+
+let tab = 'net', running = false, results = {};
+
+const $ = id => document.getElementById(id);
+
+function probe(url, timeout=2500){
+  return new Promise(res=>{
+    const img = new Image();
+    let done = false;
+    const t0 = performance.now();
+    const fin = ok => { if(done) return; done = true; img.onload = img.onerror = null;
+      const t = performance.now() - t0; res(ok && t > 2 ? t : null); };
+    img.onload = img.onerror = () => fin(true);
+    setTimeout(() => fin(false), timeout);
+    img.src = url + (url.includes('?') ? '&' : '?') + '_=' + Math.random().toString(36).slice(2);
+  });
+}
+
+async function measure(key){
+  const url = POINTS[key].url;
+  await probe(url);               // أول طلب بيفتح الاتصال، ما بنحسبه
+  const s = [];
+  for(let i=0;i<6;i++){ s.push(await probe(url)); }
+  const ok = s.filter(v=>v!=null);
+  if(!ok.length) return {ping:null};
+  const sorted = [...ok].sort((a,b)=>a-b);
+  const ping = sorted[Math.floor(sorted.length/2)];
+  let jit = 0; for(let i=1;i<ok.length;i++) jit += Math.abs(ok[i]-ok[i-1]);
+  jit = ok.length>1 ? jit/(ok.length-1) : 0;
+  return {ping, jit, loss: Math.round((1-ok.length/s.length)*100)};
+}
+
+function quality(p){
+  if(p==null) return {t:'ما في رد', c:'var(--muted)'};
+  if(p<45) return {t:'ممتاز', c:'var(--good)'};
+  if(p<80) return {t:'منيح', c:'var(--ok)'};
+  if(p<130) return {t:'مقبول', c:'var(--warn)'};
+  return {t:'سيء', c:'var(--bad)'};
+}
+
+function render(){
+  const cfg = TABS[tab];
+  const keys = [...cfg.points];
+  const have = keys.filter(k=>results[k]);
+  if(have.length) keys.sort((a,b)=>{
+    const pa = results[a]?.ping, pb = results[b]?.ping;
+    if(pa==null && pb==null) return 0; if(pa==null) return 1; if(pb==null) return -1; return pa-pb;
+  });
+  const max = Math.max(150, ...keys.map(k=>results[k]?.ping||0));
+  const list = $('list'); list.innerHTML = '';
+  keys.forEach(k=>{
+    const p = POINTS[k], r = results[k];
+    const q = quality(r?.ping);
+    const b = document.createElement('button');
+    b.className = 'row'; b.type = 'button';
+    b.innerHTML = `
+      <span class="name">${p.ar}${p.en?`<small>${p.en}</small>`:''}</span>
+      <span class="val">${r ? (r.ping!=null ? Math.round(r.ping)+' ms' : '—') : (running?'…':'')}</span>
+      <span class="bar"><i style="width:${r?.ping!=null?Math.min(100,r.ping/max*100):0}%;background:${q.c}"></i></span>
+      <span class="meta"><span>${r && r.ping!=null ? `تذبذب ${Math.round(r.jit)} ms · ضايع ${r.loss}%` : ''}</span>${r?`<span class="chip" style="color:${q.c}">${q.t}</span>`:''}</span>`;
+    b.addEventListener('click', ()=>startLive(k));
+    list.appendChild(b);
+  });
+  cfg.missing.forEach(m=>{
+    const d = document.createElement('div'); d.className='row off';
+    d.innerHTML = `<span class="name">${m}<small>ما إله نقطة قياس</small></span><span class="val">—</span>`;
+    list.appendChild(d);
+  });
+  $('note').innerHTML = cfg.note;
+
+  const best = keys.find(k=>results[k]?.ping!=null);
+  if(best){
+    const r = results[best], q = quality(r.ping);
+    $('v-lab').textContent = cfg.lab;
+    $('v-city').textContent = POINTS[best].ar;
+    $('v-ms').textContent = Math.round(r.ping)+' ms';
+    $('v-ms').style.color = q.c;
+    $('v-sub').textContent = `${q.t} · تذبذب ${Math.round(r.jit)} ms`;
+  } else {
+    $('v-lab').textContent = running ? 'جاري الفحص…' : 'اضغط ابدأ الفحص';
+    $('v-city').textContent = '—'; $('v-ms').textContent=''; $('v-sub').textContent='';
+  }
+}
+
+async function run(){
+  if(running) return;
+  stopLive();
+  running = true; $('go').disabled = true; $('go').textContent = 'جاري الفحص…';
+  const keys = TABS[tab].points;
+  keys.forEach(k=>delete results[k]);
+  render();
+  for(const k of keys){ results[k] = await measure(k); render(); }
+  running = false; $('go').disabled = false; $('go').textContent = 'افحص مرة ثانية';
+  render();
+}
+
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  if(running) return;
+  tab = b.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
+  const has = TABS[tab].points.some(k=>results[k]);
+  $('go').textContent = has ? 'افحص مرة ثانية' : 'ابدأ الفحص';
+  render();
+}));
+$('go').addEventListener('click', run);
+
+/* ---- قياس مستمر ---- */
+let liveKey = null, liveTimer = null, liveData = [];
+function startLive(k){
+  if(running) return;
+  stopLive();
+  liveKey = k; liveData = [];
+  $('live-title').textContent = 'قياس مستمر · ' + POINTS[k].ar;
+  $('live').hidden = false;
+  document.querySelector('.wrap').style.paddingBottom = '300px';
+  probe(POINTS[k].url).then(tick);
+}
+async function tick(){
+  if(!liveKey) return;
+  const k = liveKey;
+  const v = await probe(POINTS[k].url, 2000);
+  if(liveKey!==k) return;
+  liveData.push(v); if(liveData.length>60) liveData.shift();
+  drawLive();
+  liveTimer = setTimeout(tick, 1000);
+}
+function stopLive(){
+  liveKey = null; clearTimeout(liveTimer);
+  $('live').hidden = true;
+  document.querySelector('.wrap').style.paddingBottom = '';
+}
+$('live-stop').addEventListener('click', stopLive);
+
+function drawLive(){
+  const ok = liveData.filter(v=>v!=null);
+  const last = liveData[liveData.length-1];
+  $('s-now').textContent = last!=null ? Math.round(last) : '—';
+  $('s-now').style.color = quality(last).c;
+  $('s-avg').textContent = ok.length ? Math.round(ok.reduce((a,b)=>a+b,0)/ok.length) : '—';
+  $('s-max').textContent = ok.length ? Math.round(Math.max(...ok)) : '—';
+  $('s-loss').textContent = liveData.length ? Math.round((1-ok.length/liveData.length)*100)+'%' : '—';
+
+  const c = $('chart'), x = c.getContext('2d');
+  const W = c.width, H = c.height, pad = 30;
+  const cs = getComputedStyle(document.documentElement);
+  const line = cs.getPropertyValue('--line').trim(), muted = cs.getPropertyValue('--muted').trim(), acc = cs.getPropertyValue('--accent').trim(), bad = cs.getPropertyValue('--bad').trim();
+  x.clearRect(0,0,W,H);
+  const top = Math.max(100, Math.ceil(Math.max(0,...ok)/50)*50);
+  x.font = '22px ' + cs.getPropertyValue('--mono'); x.fillStyle = muted; x.strokeStyle = line; x.lineWidth = 1;
+  [0, top/2, top].forEach(v=>{
+    const y = H-pad - (v/top)*(H-pad*2);
+    x.beginPath(); x.moveTo(60,y); x.lineTo(W,y); x.stroke();
+    x.fillText(String(v), 4, y+7);
+  });
+  const step = (W-60)/59;
+  x.strokeStyle = acc; x.lineWidth = 4; x.lineJoin = 'round'; x.beginPath();
+  let started = false;
+  liveData.forEach((v,i)=>{
+    const px = 60 + (i + (60-liveData.length))*step;
+    if(v==null){ started=false; x.fillStyle = bad; x.fillRect(px-3, H-pad-6, 6, 6); return; }
+    const py = H-pad - (Math.min(v,top)/top)*(H-pad*2);
+    if(!started){ x.moveTo(px,py); started=true; } else x.lineTo(px,py);
+  });
+  x.stroke();
+}
+
+render();
+</script>
+</body>
+</html>
